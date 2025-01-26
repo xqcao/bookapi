@@ -12,10 +12,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +37,7 @@ public class BookStepDefinitions {
     private TestRestTemplate restTemplate;
 
     private ResponseEntity<?> response;
+    private List<Book> savedBooks;  // Add this field to store saved books
 
     @Before
     public void setup() {
@@ -41,45 +46,53 @@ public class BookStepDefinitions {
 
     @Given("the following books exist in the database")
     public void theFollowingBooksExistInTheDatabase(DataTable dataTable) {
+        bookRepository.deleteAll();
+        savedBooks = new ArrayList<>();
+        
         List<Map<String, String>> books = dataTable.asMaps();
         books.forEach(book -> {
             Book newBook = new Book();
-            newBook.setId(Long.parseLong(book.get("id")));
             newBook.setTitle(book.get("title"));
             newBook.setAuthor(book.get("author"));
             newBook.setIsbn(book.get("isbn"));
             newBook.setPrice(Double.parseDouble(book.get("price")));
-            bookRepository.save(newBook);
+            savedBooks.add(bookRepository.save(newBook));
         });
     }
 
     @When("I send a GET request to {string}")
     public void iSendAGETRequestTo(String endpoint) {
         String url = "http://localhost:" + port + endpoint;
-        if (endpoint.contains("/api/books/")) {
-            if (endpoint.endsWith("/999")) {
-                response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    null,
-                    new ParameterizedTypeReference<Map<String, String>>() {}
-                );
-            } else {
-                response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    null,
-                    new ParameterizedTypeReference<Book>() {}
-                );
-            }
-        } else {
+        
+        // Replace {id} placeholder with actual ID
+        if (endpoint.equals("/api/books/1")) {
+            url = "http://localhost:" + port + "/api/books/" + savedBooks.get(0).getId();
+        }
+
+        if (endpoint.equals("/api/books")) {
             response = restTemplate.exchange(
                 url,
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<List<Book>>() {}
             );
+        } else if (endpoint.contains("/api/books/999")) {
+            // For known error case, use ErrorResponse type
+            response = restTemplate.getForEntity(url, ErrorResponse.class);
+        } else {
+            response = restTemplate.getForEntity(url, Book.class);
         }
+    }
+
+    @When("I send a POST request to {string} with JSON:")
+    public void iSendAPOSTRequestToWithJSON(String endpoint, String jsonBody) {
+        String url = "http://localhost:" + port + endpoint;
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        
+        HttpEntity<String> request = new HttpEntity<>(jsonBody, headers);
+        response = restTemplate.postForEntity(url, request, Book.class);
     }
 
     @Then("the response status code should be {int}")
@@ -113,7 +126,7 @@ public class BookStepDefinitions {
     @Then("the response should contain a book with the following details")
     public void theResponseShouldContainABookWithTheFollowingDetails(DataTable dataTable) {
         Map<String, String> expectedBook = dataTable.asMaps().get(0);
-        Book actualBook = ((ResponseEntity<Book>) response).getBody();
+        Book actualBook = (Book) response.getBody();
 
         assertEquals(expectedBook.get("title"), actualBook.getTitle());
         assertEquals(expectedBook.get("author"), actualBook.getAuthor());
@@ -123,7 +136,12 @@ public class BookStepDefinitions {
 
     @Then("the response should contain error message {string}")
     public void theResponseShouldContainErrorMessage(String errorMessage) {
-        Map<String, String> errorResponse = (Map<String, String>) response.getBody();
-        assertEquals(errorMessage, errorResponse.get("message"));
+        if (response.getBody() instanceof ErrorResponse) {
+            ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+            assertEquals(errorMessage, errorResponse.getMessage());
+        } else {
+            Map<String, String> errorMap = (Map<String, String>) response.getBody();
+            assertEquals(errorMessage, errorMap.get("message"));
+        }
     }
 } 

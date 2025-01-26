@@ -5,9 +5,9 @@ Feature: Book API
 
   Background:
     Given the following books exist in the database
-      | id | title          | author        | isbn          | price |
-      | 1  | The Test Book | John Doe      | 123-456-789   | 29.99 |
-      | 2  | Spring Boot   | James Smith   | 987-654-321   | 39.99 |
+      | title          | author        | isbn          | price |
+      | The Test Book | John Doe      | 123-456-789   | 29.99 |
+      | Spring Boot   | James Smith   | 987-654-321   | 39.99 |
 
   Scenario: Get all books
     When I send a GET request to "/api/books"
@@ -28,4 +28,19 @@ Feature: Book API
   Scenario: Get a non-existent book
     When I send a GET request to "/api/books/999"
     Then the response status code should be 500
-    And the response should contain error message "Book not found with id: 999" 
+    And the response should contain error message "Book not found with id: 999"
+
+  Scenario: Create a new book
+    When I send a POST request to "/api/books" with JSON:
+      """
+      {
+        "title": "The New Book",
+        "author": "Jane Smith",
+        "isbn": "111-222-333",
+        "price": 25.99
+      }
+      """
+    Then the response status code should be 200
+    And the response should contain a book with the following details
+      | title           | author        | isbn          | price |
+      | The New Book   | Jane Smith    | 111-222-333   | 25.99 | 

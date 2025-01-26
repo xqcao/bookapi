@@ -32,6 +32,9 @@ public class BookController {
     // Create a new book
     @PostMapping
     public Book createBook(@RequestBody Book book) {
+        System.out.println("----------------->>>-----");
+        System.out.println("hhhhhh--->---"+bookRepository.save(book));
+        System.out.println("-----------------<<<<-----");
         return bookRepository.save(book);
     }
 
