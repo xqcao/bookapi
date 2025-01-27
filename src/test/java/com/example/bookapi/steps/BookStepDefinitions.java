@@ -64,7 +64,17 @@ public class BookStepDefinitions {
     public void iSendAGETRequestTo(String endpoint) {
         String url = "http://localhost:" + port + endpoint;
         
-        // Replace {id} placeholder with actual ID
+        if (endpoint.equals("/actuator/health")) {
+            response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+            return;
+        }
+
+        // Existing code for other endpoints...
         if (endpoint.equals("/api/books/1")) {
             url = "http://localhost:" + port + "/api/books/" + savedBooks.get(0).getId();
         }
@@ -77,7 +87,6 @@ public class BookStepDefinitions {
                 new ParameterizedTypeReference<List<Book>>() {}
             );
         } else if (endpoint.contains("/api/books/999")) {
-            // For known error case, use ErrorResponse type
             response = restTemplate.getForEntity(url, ErrorResponse.class);
         } else {
             response = restTemplate.getForEntity(url, Book.class);
@@ -143,5 +152,11 @@ public class BookStepDefinitions {
             Map<String, String> errorMap = (Map<String, String>) response.getBody();
             assertEquals(errorMessage, errorMap.get("message"));
         }
+    }
+
+    @Then("the health response should show status {string}")
+    public void theHealthResponseShouldShowStatus(String expectedStatus) {
+        Map<String, Object> healthResponse = (Map<String, Object>) response.getBody();
+        assertEquals(expectedStatus, healthResponse.get("status"));
     }
 } 

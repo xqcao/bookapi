@@ -43,4 +43,9 @@ Feature: Book API
     Then the response status code should be 200
     And the response should contain a book with the following details
       | title           | author        | isbn          | price |
-      | The New Book   | Jane Smith    | 111-222-333   | 25.99 | 
+      | The New Book   | Jane Smith    | 111-222-333   | 25.99 |
+
+  Scenario: Check application health
+    When I send a GET request to "/actuator/health"
+    Then the response status code should be 200
+    And the health response should show status "UP" 
