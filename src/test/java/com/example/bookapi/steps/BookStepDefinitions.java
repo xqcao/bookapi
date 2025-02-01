@@ -18,6 +18,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.json.JSONException;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,7 +61,8 @@ public class BookStepDefinitions {
             newBook.setAuthor(book.get("author"));
             newBook.setIsbn(book.get("isbn"));
             newBook.setPrice(Double.parseDouble(book.get("price")));
-            savedBooks.add(bookRepository.save(newBook));
+            Book saved = bookRepository.save(newBook);
+            savedBooks.add(saved);
         });
     }
 
@@ -65,17 +71,18 @@ public class BookStepDefinitions {
         String url = "http://localhost:" + port + endpoint;
         
         if (endpoint.equals("/actuator/health")) {
-            response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                null,
-                new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
+            System.out.println("Attempting to access health endpoint at: " + url);
+            response = restTemplate.getForEntity(url, Map.class);
+            System.out.println("Health check response: " + response);
             return;
         }
 
-        // Existing code for other endpoints...
-        if (endpoint.equals("/api/books/1")) {
+        if (endpoint.startsWith("/api/books/")) {
+            Long id = Long.parseLong(endpoint.split("/")[3]);
+            if (id == 999) {
+                response = restTemplate.getForEntity(url, ErrorResponse.class);
+                return;
+            }
             url = "http://localhost:" + port + "/api/books/" + savedBooks.get(0).getId();
         }
 
@@ -86,21 +93,19 @@ public class BookStepDefinitions {
                 null,
                 new ParameterizedTypeReference<List<Book>>() {}
             );
-        } else if (endpoint.contains("/api/books/999")) {
-            response = restTemplate.getForEntity(url, ErrorResponse.class);
         } else {
             response = restTemplate.getForEntity(url, Book.class);
         }
     }
 
-    @When("I send a POST request to {string} with JSON:")
-    public void iSendAPOSTRequestToWithJSON(String endpoint, String jsonBody) {
+    @When("I send a POST request to {string} with JSON payload:")
+    public void iSendAPOSTRequestToWithJSONPayload(String endpoint, String jsonPayload) {
         String url = "http://localhost:" + port + endpoint;
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         
-        HttpEntity<String> request = new HttpEntity<>(jsonBody, headers);
+        HttpEntity<String> request = new HttpEntity<>(jsonPayload, headers);
         response = restTemplate.postForEntity(url, request, Book.class);
     }
 
@@ -157,6 +162,13 @@ public class BookStepDefinitions {
     @Then("the health response should show status {string}")
     public void theHealthResponseShouldShowStatus(String expectedStatus) {
         Map<String, Object> healthResponse = (Map<String, Object>) response.getBody();
+        System.out.println("Health Response: " + healthResponse); // Debug log
         assertEquals(expectedStatus, healthResponse.get("status"));
+    }
+
+    @Then("the response body should contain JSON:")
+    public void theResponseBodyShouldContainJSON(String expectedJson) throws JSONException, JsonProcessingException {
+        String actualJson = new ObjectMapper().writeValueAsString(response.getBody());
+        JSONAssert.assertEquals(expectedJson, actualJson, JSONCompareMode.LENIENT);
     }
 } 

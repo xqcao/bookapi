@@ -8,7 +8,12 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 @CucumberContextConfiguration
 @SpringBootTest(
     classes = OnedemoApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+        "management.endpoints.web.base-path=/actuator",
+        "management.endpoints.web.exposure.include=health",
+        "management.endpoint.health.enabled=true"
+    }
 )
 public class CucumberTestConfig {
 
